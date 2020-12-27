@@ -61,7 +61,7 @@ export default {
   },
 
   async getAllActorsIds(): Promise<String[]> {
-    return (await mapAsync(await Actor.getAll(), actor => actor._id));
+    return await mapAsync(await Actor.getAll(), actor => actor._id);
   },
 
   async getScenesWithoutActors(_: unknown, { num }: { num: number }): Promise<Scene[]> {
