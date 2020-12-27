@@ -100,7 +100,7 @@
           placeholder="Sort by..."
           :items="sortByItems"
           class="mt-0 pt-0 mb-2"
-        ></v-select>
+        />
         <v-select
           solo
           flat
@@ -113,7 +113,7 @@
           v-model="sortDir"
           placeholder="Sort direction"
           :items="sortDirItems"
-        ></v-select>
+        />
       </v-container>
     </v-navigation-drawer>
 
@@ -143,7 +143,7 @@
           </template>
           <span>Reshuffle</span>
         </v-tooltip>
-        <v-spacer></v-spacer>
+        <v-spacer/>
         <div>
           <v-pagination
             v-if="!fetchLoader && $vuetify.breakpoint.mdAndUp"
@@ -185,7 +185,7 @@
                 class="mt-0"
                 hide-details
                 :contain="true"
-              ></v-checkbox>
+              />
             </template>
           </ImageCard>
         </v-col>

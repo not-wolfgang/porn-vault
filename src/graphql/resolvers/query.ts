@@ -60,6 +60,12 @@ export default {
       .slice(0, num || 12);
   },
 
+  async getAllActorsIds(): Promise<String[]> {
+    return (
+      await mapAsync(await Actor.getAll(), actor => actor._id)
+	  );
+  },
+
   async getScenesWithoutActors(_: unknown, { num }: { num: number }): Promise<Scene[]> {
     return (
       await mapAsync(await Scene.getAll(), async (scene) => ({

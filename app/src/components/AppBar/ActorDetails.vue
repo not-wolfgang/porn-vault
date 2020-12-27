@@ -110,6 +110,7 @@ import IActor from "../../types/actor";
 import moment from "moment";
 import CustomFieldSelector from "../CustomFieldSelector.vue";
 import countries from "../../util/countries";
+import VueRouter, { Route } from 'vue-router';
 
 @Component({
   components: {

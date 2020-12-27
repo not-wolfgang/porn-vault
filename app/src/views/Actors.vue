@@ -2,6 +2,46 @@
   <v-container fluid>
     <BindFavicon />
     <BindTitle value="Actors" />
+    <v-progress-linear
+      :active="pluginLoader"
+      indeterminate
+      absolute
+      top
+      color="deep-purple accent-4"
+    />
+
+    <v-expand-transition>
+      <v-banner app sticky class="mb-2" v-if="selectedActors.length">
+        {{ selectedActors.length }} actors selected
+        <template v-slot:actions>
+          <v-btn v-if="selectedActors.length" text @click="selectedActors = []" class="text-none"
+            >Deselect</v-btn
+          >
+          <v-btn
+            :disabled="selectedActors.length === actors.length"
+            text
+            @click="selectedActors = actors.map(act => act._id)"
+            class="text-none"
+            >Select all</v-btn
+          >
+          <v-btn
+            text
+            @click="runPluginsForSelectedActors"
+            class="text-none"
+            >Run plugins for selected actors</v-btn
+          >
+          <v-btn
+            v-if="selectedActors.length"
+            @click="deleteSelectedActorsDialog = true"
+            text
+            class="text-none"
+            color="error"
+            >Delete</v-btn
+          >
+        </template>
+      </v-banner>
+    </v-expand-transition>
+
     <v-navigation-drawer v-if="showSidenav" style="z-index: 14" v-model="drawer" clipped app>
       <v-container>
         <v-btn
@@ -44,7 +84,7 @@
             <v-icon>{{ bookmarksOnly ? "mdi-bookmark" : "mdi-bookmark-outline" }}</v-icon>
           </v-btn>
 
-          <v-spacer></v-spacer>
+          <v-spacer />
 
           <Rating @input="ratingFilter = $event" :value="ratingFilter" />
         </div>
@@ -149,7 +189,15 @@
           </template>
           <span>Reshuffle</span>
         </v-tooltip>
-        <v-spacer></v-spacer>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on }">
+            <v-btn v-on="on" @click="runPluginsForAllActors" icon>
+              <v-icon>mdi-account-details</v-icon>
+            </v-btn>
+          </template>
+          <span>Run plugins for all actors</span>
+        </v-tooltip>
+        <v-spacer />
         <div>
           <v-pagination
             v-if="!fetchLoader && $vuetify.breakpoint.mdAndUp"
@@ -158,13 +206,13 @@
             :total-visible="7"
             :disabled="fetchLoader"
             :length="numPages"
-          ></v-pagination>
+          />
         </div>
       </div>
       <v-row v-if="!fetchLoader && numResults">
         <v-col
           class="pa-1"
-          v-for="(actor, i) in actors"
+          v-for="(actor, index) in actors"
           :key="actor._id"
           cols="6"
           sm="6"
@@ -172,7 +220,26 @@
           lg="3"
           xl="2"
         >
-          <actor-card :showLabels="showCardLabels" v-model="actors[i]" style="height: 100%" />
+          <actor-card
+            :showLabels="showCardLabels"
+            v-model="actors[index]"
+            :class="
+              selectedActors.length && !selectedActors.includes(actor._id) ? 'not-selected' : ''
+            "
+            @click.native.stop="onActorClick(actor, index, $event, false)"
+            >
+            <template v-slot:action>
+              <v-checkbox
+                color="primary"
+                :input-value="selectedActors.includes(actor._id)"
+                readonly
+                @click.native.stop="onActorClick(actor, index, $event, true)"
+                class="mt-0"
+                hide-details
+                :contain="true"
+              />
+            </template>
+          </actor-card>
         </v-col>
       </v-row>
       <NoResults v-else-if="!fetchLoader && !numResults" />
@@ -185,7 +252,7 @@
         :total-visible="7"
         :disabled="fetchLoader"
         :length="numPages"
-      ></v-pagination>
+      />
     </div>
 
     <v-dialog v-model="createActorDialog" max-width="400px">
@@ -230,9 +297,9 @@
             >
           </v-form>
         </v-card-text>
-        <v-divider></v-divider>
+        <v-divider/>
         <v-card-actions>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn text class="text-none" :disabled="!validCreation" color="primary" @click="addActor"
             >Add</v-btn
           >
@@ -247,11 +314,11 @@
         <v-card-text style="max-height: 400px">
           <LabelSelector :items="allLabels" v-model="createSelectedLabels" />
         </v-card-text>
-        <v-divider></v-divider>
+        <v-divider/>
 
         <v-card-actions>
           <v-btn @click="createSelectedLabels = []" text class="text-none">Clear</v-btn>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn @click="labelSelectorDialog = false" text color="primary" class="text-none"
             >OK</v-btn
           >
@@ -274,10 +341,10 @@
             hint="1 actor name per line"
           ></v-textarea>
         </v-card-text>
-        <v-divider></v-divider>
+        <v-divider/>
 
         <v-card-actions>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn
             @click="runBulkImport"
             text
@@ -286,6 +353,17 @@
             :disabled="!actorsBulkImport.length"
             >Add {{ actorsBulkImport.length }} actors</v-btn
           >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteSelectedActorsDialog" max-width="400px">
+      <v-card>
+        <v-card-title>Really delete {{ selectedActors.length }} actors?</v-card-title>
+        <v-card-text />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn class="text-none" color="error" text @click="deleteSelection">Delete</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -393,6 +471,7 @@ export default class ActorList extends mixins(DrawerMixin) {
   createSelectedLabels = [] as number[];
   labelSelectorDialog = false;
   addActorLoader = false;
+  pluginLoader = false;
 
   actorNameRules = [(v) => (!!v && !!v.length) || "Invalid actor name"];
 
@@ -659,12 +738,151 @@ export default class ActorList extends mixins(DrawerMixin) {
     this.fetchingRandom = true;
     this.fetchPage(1, 1, true, Math.random().toString())
       .then((result) => {
-        // @ts-ignore
         this.$router.push(`/actor/${result.items[0]._id}`);
       })
       .catch((err) => {
         this.fetchingRandom = false;
       });
+  }
+
+  async runPluginsForSelectedActors() {
+    this.pluginLoader = true;
+
+    const actorsIds = this.selectedActors;
+
+    await this.runPluginsBulk(actorsIds);
+  }
+
+  async runPluginsForAllActors() {
+    this.pluginLoader = true;
+
+    const result = await ApolloClient.query({
+        query: gql`
+          {
+            getAllActorsIds
+          }
+        `,
+    });
+
+    const actorsIds = result.data.getAllActorsIds;
+
+    await this.runPluginsBulk(actorsIds);
+  }
+
+  async runPluginsBulk(actorsIds: string[]) {
+    this.pluginLoader = true;
+
+    try {
+      for (const id of actorsIds) {
+        await this.runPluginsForAnActor(id);
+      }
+      this.pluginLoader = false;
+    } catch (error) {
+      this.pluginLoader = false;
+      console.error(error);
+    }
+  }
+
+  async runPluginsForAnActor(id: string) {
+    await ApolloClient.mutate({
+      mutation: gql`
+        mutation($id: String!) {
+          runActorPlugins(id: $id) {
+            ...ActorFragment
+            numScenes
+            labels {
+              _id
+              name
+              color
+            }
+            thumbnail {
+              _id
+              color
+            }
+            altThumbnail {
+              _id
+            }
+            watches
+            hero {
+              _id
+              color
+            }
+            avatar {
+              _id
+            }
+          }
+        }
+        ${actorFragment}
+      `,
+      variables: {
+        id: id,
+      },
+    })
+      .catch((err) => {
+        console.error(err);
+      })
+  }
+
+  selectedActors = [] as string[];
+  lastSelectionActorId: string | null = null;
+  deleteSelectedActorsDialog = false;
+
+  isActorSelected(id: string) {
+    return !!this.selectedActors.find((selectedId) => id === selectedId);
+  }
+
+  selectActor(id: string, add: boolean) {
+    this.lastSelectionActorId = id;
+    if (add && !this.isActorSelected(id)) {
+      this.selectedActors.push(id);
+    } else {
+      this.selectedActors = this.selectedActors.filter((i) => i != id);
+    }
+  }
+
+  /**
+   * @param actor - the clicked actor
+   * @param index - the index of the actor in the array
+   * @param event - the mouse click event
+   * @param forceSelectionChange - whether to force a selection change, instead of opening the actor
+   */
+  onActorClick(actor: IActor, index: number, event: MouseEvent, forceSelectionChange = true) {
+    // Use the last selected actor or the current one, to allow toggling
+    // even when no previous selection
+    let lastSelectionActorIndex =
+      this.lastSelectionActorId !== null
+        ? this.actors.findIndex((act) => act._id === this.lastSelectionActorId)
+        : index;
+    lastSelectionActorIndex = lastSelectionActorIndex === -1 ? index : lastSelectionActorIndex;
+
+    if (forceSelectionChange || event.ctrlKey) {
+      this.selectActor(actor._id, !this.isActorSelected(actor._id));
+    } else if (!forceSelectionChange) {
+      this.$router.push(`/actor/${actor._id}`);
+    }
+  }
+
+  deleteSelection() {
+    ApolloClient.mutate({
+      mutation: gql`
+        mutation($ids: [String!]!) {
+          removeActors(ids: $ids)
+        }
+      `,
+      variables: {
+        ids: this.selectedActors,
+      },
+    })
+      .then((res) => {
+        for (const id of this.selectedActors) {
+          this.actors = this.actors.filter(act => act._id != id);
+        }
+        this.selectedActors = [];
+        this.deleteSelectedActorsDialog = false;
+      })
+      .catch((err) => {
+        console.error(err);
+      })
   }
 
   async fetchPage(page: number, take = 24, random?: boolean, seed?: string) {

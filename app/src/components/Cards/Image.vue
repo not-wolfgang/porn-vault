@@ -17,7 +17,7 @@
       </div>
 
       <template v-slot:placeholder>
-        <v-skeleton-loader width="100%" height="100%" tile loading type="image"></v-skeleton-loader>
+        <v-skeleton-loader width="100%" height="100%" tile loading type="image" />
       </template>
     </v-img>
   </v-card>
